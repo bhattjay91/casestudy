@@ -5,8 +5,10 @@ import App from './App'
 import router from './router'
 import Notifications from 'vue-notification'
 import VueProgressBar from 'vue-progressbar'
+import VueTippy from 'vue-tippy'
 
 Vue.use(Notifications)
+Vue.use(VueTippy)
 
 const options = {
   color: '#18BC9C',

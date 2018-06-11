@@ -2,7 +2,11 @@
 	<div>
     <p class="lead">Do you want to import physicians?</p>
     <hr class="my-4">
-    <h5>Here are some rules to import</h5>
+		<h5>Just click the button below to Import Data via OpenPaymentsData.com </h5>
+		<button type="button" class="btn btn-primary" @click="getImportData" :disabled="showLoading">IMPORT<span v-show="showLoading" >ING... <i class="fa fa-circle-o-notch fa-spin" style="font-size:16px"></i></span></button>
+
+		<br/>	<br/>
+    <h5>Or You can import data manually. Here are some rules to import</h5>
     <ul>
       <li>Import must be CSV</li>
       <li>That's it. <small> Don't worry, you will be notify for any danger! error.</small></li>
@@ -21,6 +25,7 @@
       </div>
     </div>
     </div>
+
     <span v-show="processloader">
       Importing....<small>Please wait</small>
     </span>
@@ -38,7 +43,11 @@ import axios from 'axios';
 	    data() {
 	        return {
             processloader: false,
-            uploadFile:''
+            uploadFile:'',
+						showLoading: false,
+						pagingLimit:'',
+						pagingOffset:''
+
 	        }
 	    },
       created: function(){
@@ -68,6 +77,57 @@ import axios from 'axios';
         handleFileUpload(){
           this.uploadFile = this.$refs.fileform.files[0];
         },
+				getPaging: function(){
+					let self = this;
+					axios.get('http://46.101.56.165:8001/paging')
+					.then(function(response){
+						let settings = response.data;
+						return self.getPaymentData(settings);
+					}).catch(error=>{
+						self.showError("something went wrong on fetching paging settings")
+					})
+				},
+				getImportData: function(e){
+					e.preventDefault();
+					let self = this;
+					self.showLoading = true;
+					self.$Progress.start();
+					this.getPaging();
+				},
+				getPaymentData: function(settings){
+					let self = this;
+					//let urlOpenPaymentData = 	`https://openpaymentsdata.cms.gov/resource/qh6m-nw4f.json?$select=physician_profile_id&$limit=5000&$order=payment_publication_date DESC&$offset=0`
+				 	let urlOpenPaymentData = 'https://openpaymentsdata.cms.gov/resource/qh6m-nw4f.json?$limit='+settings.limits+'&$offset='+settings.offsets;
+
+					axios({
+							url: urlOpenPaymentData,
+							type: "GET",
+					}).then(function(response) {
+							return self.doImport(response.data);
+					}).catch(error=>{});
+				},
+				doImport: function(data){
+					let self = this;
+					axios.post('http://46.101.56.165:8001/upload/all',{"data":data})
+					.then(function(response){
+						self.showLoading = false;
+						self.$Progress.finish();
+						self.showSuccess(response.data.message)
+						return self.updatePaging();
+					}).catch(error=>{
+						self.showLoading = false;
+						self.showError(error.response.data.message)
+					})
+				},
+				updatePaging: function(){
+					let self = this;
+					axios.post('http://46.101.56.165:8001/paging/update')
+					.then(function(response){
+							console.log("paging was updated")
+					}).catch(error=>{
+						self.showError("something went wrong on updating paging settings")
+					})
+				},
         upload: function(e){
 
           let self = this;
@@ -89,6 +149,7 @@ import axios from 'axios';
               self.$data.processloader = false
               self.$Progress.finish();
               self.showSuccess(response.data.message)
+
           })
           .catch(error => {
               self.$Progress.fail();
